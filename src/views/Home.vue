@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { useEventListener, useFullscreen } from '@vueuse/core'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import WellbeingChart from '@/components/WellbeingChart.vue'
-import { type ChartDef, type Stat, sections, summary } from '@/data/wellbeing2025'
-import doh12Logo from '@images/logos/doh12-logo.png'
+import {
+  type ChartDef,
+  type Stat,
+  type WellbeingStats,
+  buildSections,
+  buildSummary,
+} from '@/data/wellbeing'
+import { api } from '@/utils/api'
 import dohLogo from '@images/logos/doh-logo.png'
+import doh12Logo from '@images/logos/doh12-logo.png'
 
 type Slide =
   | { kind: 'title' }
@@ -12,11 +19,47 @@ type Slide =
   | { kind: 'chart'; section: string; chart: ChartDef }
   | { kind: 'stats'; section: string; stats: Stat[] }
 
-// Presentation order: title, summary, then every section's charts (and stats)
+// ---------- Live data ----------
+const stats = ref<WellbeingStats | null>(null)
+const selectedYear = ref<number | null>(null)
+const isLoading = ref(false)
+const errorMessage = ref('')
+
+const summary = computed(() => (stats.value ? buildSummary(stats.value) : null))
+const sections = computed(() => (stats.value ? buildSections(stats.value) : []))
+
+const hasData = computed(
+  () => !!stats.value && (stats.value.philpen.total > 0 || stats.value.ame.total > 0),
+)
+
+async function loadStats(year?: number | null) {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    const { data } = await api.get<WellbeingStats>('/dashboard/stats', {
+      params: year ? { year } : {},
+    })
+
+    stats.value = data
+    selectedYear.value = data.year
+  }
+  catch {
+    errorMessage.value = 'Cannot load the dashboard data. Please make sure the server is running.'
+  }
+  finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => loadStats())
+
+// ---------- Presentation mode ----------
+// Order: title, summary, then every section's charts (and stats)
 const slides = computed<Slide[]>(() => {
   const list: Slide[] = [{ kind: 'title' }, { kind: 'summary' }]
 
-  sections.forEach(section => {
+  sections.value.forEach(section => {
     section.charts.forEach(chart => list.push({ kind: 'chart', section: section.title, chart }))
     if (section.stats)
       list.push({ kind: 'stats', section: section.title, stats: section.stats })
@@ -107,139 +150,194 @@ function keyFigures(chart: ChartDef) {
     <div class="d-flex flex-wrap align-center justify-space-between gap-4 mb-6">
       <div>
         <h4 class="text-h4 font-weight-bold text-primary">
-          {{ summary.title }} {{ summary.year }}
+          Regular Employees Wellbeing Report
         </h4>
         <p class="text-body-1 text-medium-emphasis mb-0">
           Health status of regular employees
         </p>
       </div>
 
-      <VBtn
-        color="primary"
-        size="large"
-        prepend-icon="mdi-presentation-play"
-        @click="startPresentation"
-      >
-        Present
-      </VBtn>
+      <div class="d-flex align-center gap-3">
+        <VSelect
+          v-if="stats && stats.available_years.length"
+          v-model="selectedYear"
+          :items="stats.available_years"
+          label="Year"
+          density="compact"
+          hide-details
+          style="inline-size: 120px;"
+          @update:model-value="loadStats"
+        />
+
+        <VBtn
+          icon="mdi-refresh"
+          variant="tonal"
+          :loading="isLoading"
+          @click="loadStats(selectedYear)"
+        />
+
+        <VBtn
+          color="primary"
+          size="large"
+          prepend-icon="mdi-presentation-play"
+          :disabled="!hasData"
+          @click="startPresentation"
+        >
+          Present
+        </VBtn>
+      </div>
     </div>
 
-    <!-- Summary cards -->
-    <VRow class="mb-4">
-      <VCol
-        cols="12"
-        sm="6"
-        md
-      >
-        <VCard color="primary" variant="flat">
-          <VCardText>
-            <p class="text-body-2 mb-1">
-              Regular employees
-            </p>
-            <h3 class="text-h3 font-weight-bold">
-              {{ summary.totalRegular }}
-            </h3>
-          </VCardText>
-        </VCard>
-      </VCol>
+    <VProgressLinear
+      v-if="isLoading && !stats"
+      indeterminate
+      class="mb-4"
+    />
 
-      <VCol
-        v-for="division in summary.divisions"
-        :key="division.code"
-        cols="12"
-        sm="6"
-        md
-      >
-        <VCard>
-          <VCardText>
-            <p class="text-body-2 text-medium-emphasis mb-1">
-              {{ division.code }}
-            </p>
-            <h3 class="text-h3 font-weight-bold">
-              {{ division.count }}
-            </h3>
-            <p class="text-caption text-medium-emphasis mb-0">
-              {{ division.name }}
-            </p>
-          </VCardText>
-        </VCard>
-      </VCol>
-    </VRow>
-
-    <!-- Sections -->
-    <section
-      v-for="section in sections"
-      :key="section.id"
-      class="mb-8"
+    <VAlert
+      v-if="errorMessage"
+      type="error"
+      variant="tonal"
+      class="mb-4"
     >
-      <div class="d-flex align-center gap-2 mb-4">
-        <VIcon
-          :icon="section.icon"
-          color="primary"
-        />
-        <h5 class="text-h5 font-weight-semibold">
-          {{ section.title }}
-        </h5>
-      </div>
+      {{ errorMessage }}
+      <template #append>
+        <VBtn
+          variant="text"
+          @click="loadStats(selectedYear)"
+        >
+          Retry
+        </VBtn>
+      </template>
+    </VAlert>
 
-      <VRow
-        v-if="section.stats"
-        class="mb-2"
-      >
+    <template v-if="stats && summary">
+      <!-- Summary cards -->
+      <VRow class="mb-4">
         <VCol
-          v-for="stat in section.stats"
-          :key="stat.label"
           cols="12"
           sm="6"
-          md="4"
+          md
+        >
+          <VCard
+            color="primary"
+            variant="flat"
+          >
+            <VCardText>
+              <p class="text-body-2 mb-1">
+                Regular employees
+              </p>
+              <h3 class="text-h3 font-weight-bold">
+                {{ summary.totalRegular }}
+              </h3>
+            </VCardText>
+          </VCard>
+        </VCol>
+
+        <VCol
+          v-for="division in summary.divisions"
+          :key="division.code"
+          cols="12"
+          sm="6"
+          md
         >
           <VCard>
-            <VCardText class="d-flex align-center gap-4">
-              <h3
-                class="text-h3 font-weight-bold"
-                :style="{ color: stat.color }"
-              >
-                {{ stat.value }}
-              </h3>
-              <span class="text-body-1">{{ stat.label }}</span>
-            </VCardText>
-          </VCard>
-        </VCol>
-      </VRow>
-
-      <VRow>
-        <VCol
-          v-for="chart in section.charts"
-          :key="chart.id"
-          cols="12"
-          md="6"
-          xl="4"
-        >
-          <VCard :title="chart.title">
             <VCardText>
-              <WellbeingChart
-                :chart="chart"
-                :height="280"
-              />
-              <p
-                v-if="chart.note"
-                class="text-caption text-medium-emphasis mt-2 mb-0"
-              >
-                {{ chart.note }}
+              <p class="text-body-2 text-medium-emphasis mb-1">
+                {{ division.code }}
               </p>
+              <h3 class="text-h3 font-weight-bold">
+                {{ division.count }}
+              </h3>
             </VCardText>
           </VCard>
         </VCol>
       </VRow>
-    </section>
 
-    <p class="text-caption text-medium-emphasis">
-      Data source: 2025 Wellbeing Report deck (static values). To be connected to live records.
-    </p>
+      <VAlert
+        v-if="!hasData"
+        type="info"
+        variant="tonal"
+        class="mb-6"
+      >
+        No assessments or medical exams are recorded for {{ summary.year }} yet.
+      </VAlert>
+
+      <!-- Sections -->
+      <section
+        v-for="section in sections"
+        :key="section.id"
+        class="mb-8"
+      >
+        <div class="d-flex align-center gap-2 mb-4">
+          <VIcon
+            :icon="section.icon"
+            color="primary"
+          />
+          <h5 class="text-h5 font-weight-semibold">
+            {{ section.title }}
+          </h5>
+        </div>
+
+        <VRow
+          v-if="section.stats"
+          class="mb-2"
+        >
+          <VCol
+            v-for="stat in section.stats"
+            :key="stat.label"
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <VCard>
+              <VCardText class="d-flex align-center gap-4">
+                <h3
+                  class="text-h3 font-weight-bold"
+                  :style="{ color: stat.color }"
+                >
+                  {{ stat.value }}
+                </h3>
+                <span class="text-body-1">{{ stat.label }}</span>
+              </VCardText>
+            </VCard>
+          </VCol>
+        </VRow>
+
+        <VRow>
+          <VCol
+            v-for="chart in section.charts"
+            :key="chart.id"
+            cols="12"
+            md="6"
+            xl="4"
+          >
+            <VCard :title="chart.title">
+              <VCardText>
+                <WellbeingChart
+                  :chart="chart"
+                  :height="280"
+                />
+                <p
+                  v-if="chart.note"
+                  class="text-caption text-medium-emphasis mt-2 mb-0"
+                >
+                  {{ chart.note }}
+                </p>
+              </VCardText>
+            </VCard>
+          </VCol>
+        </VRow>
+      </section>
+
+      <p class="text-caption text-medium-emphasis">
+        Live data from the clinic database ({{ summary.year }}).
+      </p>
+    </template>
 
     <!-- Presentation mode -->
     <div
-      v-if="isPresenting"
+      v-if="isPresenting && summary"
       ref="stage"
       class="stage"
     >
@@ -264,8 +362,16 @@ function keyFigures(chart: ChartDef) {
           class="text-center"
         >
           <div class="d-flex justify-center gap-6 mb-8">
-            <img :src="dohLogo" alt="DOH logo" height="120">
-            <img :src="doh12Logo" alt="DOH XII logo" height="120">
+            <img
+              :src="dohLogo"
+              alt="DOH logo"
+              height="120"
+            >
+            <img
+              :src="doh12Logo"
+              alt="DOH XII logo"
+              height="120"
+            >
           </div>
           <h1 class="text-h2 font-weight-bold text-primary mb-2">
             {{ summary.title }}
@@ -297,9 +403,6 @@ function keyFigures(chart: ChartDef) {
                 </h3>
                 <p class="text-h6 mb-1">
                   {{ division.code }}
-                </p>
-                <p class="text-body-2 text-medium-emphasis mb-0">
-                  {{ division.name }}
                 </p>
               </VCard>
             </VCol>
@@ -409,7 +512,8 @@ function keyFigures(chart: ChartDef) {
   background: rgb(var(--v-theme-background));
   color: rgb(var(--v-theme-on-background));
   inset: 0;
-  padding: 24px 40px;
+  padding-block: 24px;
+  padding-inline: 40px;
 }
 
 .stage-top,
@@ -421,16 +525,16 @@ function keyFigures(chart: ChartDef) {
 
 .stage-body {
   display: flex;
+  overflow: auto;
   flex: 1;
   align-items: center;
   justify-content: center;
-  overflow: auto;
 }
 
 .dot {
+  flex-shrink: 0;
   border-radius: 50%;
   block-size: 18px;
-  flex-shrink: 0;
   inline-size: 18px;
 }
 </style>

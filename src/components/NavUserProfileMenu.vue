@@ -1,16 +1,24 @@
 <script lang="ts" setup>
 import { useRouter } from 'vue-router'
-import avatar from '@images/avatars/avatar-6.png'
+import avatar from '@images/avatars/default-user.png'
 
-type StoredUser = {
+interface StoredUser {
   id: number
   emp_id: number
   username: string
   level: string
+  full_name?: string
+  position?: string | null
+  photo_url?: string | null
 }
 
 const router = useRouter()
 const user = ref<StoredUser | null>(null)
+const photoFailed = ref(false)
+
+const photoSrc = computed(() =>
+  !photoFailed.value && user.value?.photo_url ? user.value.photo_url : avatar,
+)
 
 onMounted(() => {
   const stored = localStorage.getItem('user')
@@ -26,28 +34,28 @@ function logout() {
 
 <template>
   <VAvatar class="cursor-pointer">
-    <VImg :src="avatar" />
+    <VImg
+      :src="photoSrc"
+      @error="photoFailed = true"
+    />
 
     <VMenu activator="parent">
       <VList>
-        <VListItem
-          v-if="user"
-          :append-avatar="avatar"
-        >
-          <VListItemTitle>{{ user.username }}</VListItemTitle>
-          <VListItemSubtitle>{{ user.level }}</VListItemSubtitle>
+        <VListItem v-if="user">
+          <VListItemTitle>{{ user.full_name || user.username }}</VListItemTitle>
+          <VListItemSubtitle>{{ user.position || user.level }}</VListItemSubtitle>
+
+          <template #append>
+            <VAvatar size="40">
+              <VImg
+                :src="photoSrc"
+                @error="photoFailed = true"
+              />
+            </VAvatar>
+          </template>
         </VListItem>
         <VDivider class="mt-2" />
-        <VListItem
-          v-for="item in [{ title: 'Home', icon: 'mdi-home-outline' },
-                          { title: 'Profile', icon: 'mdi-account-outline' },
-                          { title: 'Settings', icon: 'mdi-cog-outline' }]"
-          :key="item.title"
-          :value="item.title"
-          :append-icon="item.icon"
-        >
-          <VListItemTitle>{{ item.title }}</VListItemTitle>
-        </VListItem>
+
         <VDivider />
         <VListItem
           append-icon="mdi-logout"

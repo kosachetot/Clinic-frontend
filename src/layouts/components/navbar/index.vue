@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import Logo from '@/components/Logo.vue'
 import NavUserProfileMenu from '@/components/NavUserProfileMenu.vue'
-import Notifications from '@/components/Notifications.vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 import { useAppConfig } from '@/composable/useAppConfig'
 import { appConfig } from '@appConfig'
@@ -53,9 +52,6 @@ const { navigationMenu, isNavbarFixed } = useAppConfig()
         <!-- ThemeSwitcher -->
         <ThemeSwitcher />
       </template>
-
-      <!-- Notifications -->
-      <Notifications />
 
       <!-- user menu -->
       <NavUserProfileMenu />

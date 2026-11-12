@@ -3,7 +3,7 @@ import type { ApexOptions } from 'apexcharts'
 import { computed } from 'vue'
 import VueApexCharts from 'vue3-apexcharts'
 import { useTheme } from 'vuetify'
-import type { ChartDef } from '@/data/wellbeing2025'
+import type { ChartDef } from '@/data/wellbeing'
 
 const props = withDefaults(defineProps<{
   chart: ChartDef
@@ -23,6 +23,15 @@ const isBar = computed(() => props.chart.type === 'bar')
 const colors = computed(
   () => props.chart.colors ?? ['#0a7ea4', '#12a58a', '#f9a825', '#e53935', '#7e57c2'],
 )
+
+// A chart with only zeros has nothing to draw
+const hasData = computed(() => {
+  const all = props.chart.series
+    ? props.chart.series.flatMap(s => s.values)
+    : (props.chart.values ?? [])
+
+  return all.some(v => v > 0)
+})
 
 const series = computed<ApexOptions['series']>(() => {
   if (!isBar.value)
@@ -95,9 +104,17 @@ const options = computed<ApexOptions>(() => {
 
 <template>
   <VueApexCharts
+    v-if="hasData"
     :type="isBar ? 'bar' : 'pie'"
     :height="height"
     :options="options"
     :series="series"
   />
+  <div
+    v-else
+    class="d-flex align-center justify-center text-medium-emphasis"
+    :style="{ blockSize: `${height}px` }"
+  >
+    No data yet
+  </div>
 </template>

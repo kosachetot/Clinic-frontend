@@ -1,16 +1,14 @@
 <script lang="ts" setup>
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
-import { useLocale } from 'vuetify'
-
-import Logo from '@/components/Logo.vue'
 import { useAppConfig } from '@/composable/useAppConfig'
 import type { VerticalMenuItem } from '@/layouts/components/types'
 import { isGroupActive } from '@/layouts/components/utils'
 import VerticalNavGroup from '@/layouts/components/vertical-nav/VerticalNavGroup.vue'
 import VerticalNavLink from '@/layouts/components/vertical-nav/VerticalNavLink.vue'
 import verticalItems from '@/menus/vertical'
-import { appConfig } from '@appConfig'
+import dohLogo from '@images/logos/doh-logo.png'
 import 'vue3-perfect-scrollbar/dist/vue3-perfect-scrollbar.css'
+import { useLocale } from 'vuetify'
 
 const props = defineProps<{
   isDrawerOpen: boolean
@@ -79,14 +77,18 @@ const handleScroll = () => {
           class="d-flex align-center text-primary gap-2 ps-2"
         >
           <!-- logo -->
-          <Logo />
+          <img
+            :src="dohLogo"
+            alt="DOH logo"
+            height="32"
+          >
 
           <!-- title -->
           <h6
             class="app-title text-h6 text-medium-emphasis font-weight-semibold"
             :class="$vuetify.display.lgAndUp && isVerticalMenuMini ? 'rail-mode-is-on' : ''"
           >
-            <span class="text-gradient">{{ appConfig.title.value }}</span>
+            <span class="text-gradient">Clinic</span>
           </h6>
         </RouterLink>
 

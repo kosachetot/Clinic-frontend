@@ -5,9 +5,13 @@ export default [
     to: { name: 'home' },
   },
   {
-    name: 'Blank Page',
-    icon: 'mdi-file-outline',
-    to: { name: 'blank' },
+    name: 'PhilPEN Assessment',
+    icon: 'mdi-clipboard-pulse-outline',
+    to: { name: 'philpen-assessments' },
   },
-  { name: 'Documentation', icon: 'mdi-text-box-outline', href: 'https://docs.icreatorstudio.com/  ', target: '_blank' },
+  {
+    name: 'Annual Medical Exam',
+    icon: 'mdi-stethoscope',
+    to: { name: 'annual-medical-exams' },
+  },
 ]
