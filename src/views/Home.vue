@@ -10,6 +10,7 @@ import {
   buildSummary,
 } from '@/data/wellbeing'
 import { api } from '@/utils/api'
+import { exportDashboardPpt } from '@/utils/exportDashboardPpt'
 import dohLogo from '@images/logos/doh-logo.png'
 import doh12Logo from '@images/logos/doh12-logo.png'
 
@@ -85,6 +86,26 @@ function stopPresentation() {
   isPresenting.value = false
   if (isFullscreen.value)
     exit()
+}
+
+const exporting = ref(false)
+
+async function downloadPpt() {
+  if (!summary.value)
+    return
+
+  exporting.value = true
+  try {
+    await exportDashboardPpt({
+      summary: summary.value,
+      slides: slides.value,
+      keyFigures,
+      logos: [dohLogo, doh12Logo],
+    })
+  }
+  finally {
+    exporting.value = false
+  }
 }
 
 const next = () => { current.value = Math.min(current.value + 1, slides.value.length - 1) }
@@ -175,7 +196,16 @@ function keyFigures(chart: ChartDef) {
           :loading="isLoading"
           @click="loadStats(selectedYear)"
         />
-
+        <VBtn
+          variant="tonal"
+          size="large"
+          prepend-icon="mdi-file-powerpoint-outline"
+          :disabled="!hasData"
+          :loading="exporting"
+          @click="downloadPpt"
+        >
+          Download PPT
+        </VBtn>
         <VBtn
           color="primary"
           size="large"
