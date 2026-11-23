@@ -15,4 +15,9 @@ export default [
     icon: 'mdi-stethoscope',
     to: { name: 'annual-medical-exams' },
   },
+  {
+    name: 'Audit Trail',
+    icon: 'mdi-history',
+    to: { name: 'audit-trail' },
+  },
 ]

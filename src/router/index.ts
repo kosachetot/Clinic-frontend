@@ -48,21 +48,29 @@ const router = createRouter({
       },
     },
     {
-  path: '/philpen-assessments',
-  name: 'philpen-assessments',
-  component: () => import('@/views/PhilpenAssessments.vue'),
-  meta: {
-    layout: 'content',
-  },
-},
-{
-  path: '/annual-medical-exams',
-  name: 'annual-medical-exams',
-  component: () => import('@/views/AnnualMedicalExams.vue'),
-  meta: {
-    layout: 'content',
-  },
-},
+      path: '/philpen-assessments',
+      name: 'philpen-assessments',
+      component: () => import('@/views/PhilpenAssessments.vue'),
+      meta: {
+        layout: 'content',
+      },
+    },
+    {
+      path: '/annual-medical-exams',
+      name: 'annual-medical-exams',
+      component: () => import('@/views/AnnualMedicalExams.vue'),
+      meta: {
+        layout: 'content',
+      },
+    },
+    {
+      path: '/audit-trail',
+      name: 'audit-trail',
+      component: () => import('@/views/AuditTrail.vue'),
+      meta: {
+        layout: 'content',
+      },
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',

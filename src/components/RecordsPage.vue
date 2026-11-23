@@ -8,6 +8,22 @@ import { api } from '@/utils/api'
 
 const props = defineProps<{ config: RecordsConfig }>()
 
+const BP_LABELS: Record<string, string> = {
+  normal: 'Normal',
+  elevated: 'Elevated',
+  stage1: 'Stage 1',
+  stage2: 'Stage 2',
+  severe: 'Severe / Crisis',
+}
+
+const BP_COLORS: Record<string, string> = {
+  normal: 'success',
+  elevated: 'warning',
+  stage1: 'orange',
+  stage2: 'error',
+  severe: 'error',
+}
+
 const items = ref<Record<string, any>[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -15,6 +31,7 @@ const itemsPerPage = ref(15)
 const search = ref('')
 const yearFilter = ref<number | null>(null)
 const divisionFilter = ref<number | null>(null)
+const missingFilter = ref<string | null>(null)
 const isLoading = ref(false)
 const loadError = ref('')
 
@@ -60,10 +77,18 @@ async function loadItems() {
         search: search.value || undefined,
         year: yearFilter.value || undefined,
         division_id: divisionFilter.value || undefined,
+        missing: missingFilter.value || undefined,
       },
     })
 
-    items.value = data.data
+    items.value = data.data.map((row: Record<string, any>) => ({
+      ...row,
+      bp_display: row.bp_avg_systolic != null && row.bp_avg_diastolic != null
+        ? `${row.bp_avg_systolic}/${row.bp_avg_diastolic}`
+        : '-',
+      hba1c: row.hba1c ?? '-',
+      cholesterol: row.cholesterol ?? '-',
+    }))
     total.value = data.total
   }
   catch {
@@ -83,7 +108,7 @@ function reloadFromFirstPage() {
 }
 
 watch([page, itemsPerPage], loadItems)
-watch([yearFilter, divisionFilter], reloadFromFirstPage)
+watch([yearFilter, divisionFilter, missingFilter], reloadFromFirstPage)
 
 const debouncedSearch = useDebounceFn(reloadFromFirstPage, 350)
 
@@ -141,6 +166,42 @@ async function confirmDelete() {
   }
 }
 
+// ---------- Excel export ----------
+const isExporting = ref(false)
+
+async function downloadExcel() {
+  isExporting.value = true
+
+  try {
+    const response = await api.get(`${props.config.endpoint}/export`, {
+      params: {
+        year: yearFilter.value || undefined,
+        division_id: divisionFilter.value || undefined,
+        search: search.value || undefined,
+        missing: missingFilter.value || undefined,
+      },
+      responseType: 'blob',
+    })
+
+    const url = URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+
+    link.href = url
+
+    const prefix = props.config.endpoint === '/philpen-assessments' ? 'PhilPEN_and_MH' : 'Annual_Medical_Exam'
+
+    link.download = `${prefix}_${yearFilter.value ?? 'all_years'}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+  catch {
+    notify('Could not generate the Excel file.', 'error')
+  }
+  finally {
+    isExporting.value = false
+  }
+}
+
 // ---------- Messages ----------
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
@@ -167,14 +228,26 @@ function onSaved(message: string) {
         </p>
       </div>
 
-      <VBtn
-        color="primary"
-        size="large"
-        prepend-icon="mdi-plus"
-        @click="openAdd"
-      >
-        Add {{ config.singular }}
-      </VBtn>
+      <div class="d-flex gap-3">
+        <VBtn
+          variant="tonal"
+          size="large"
+          prepend-icon="mdi-file-excel-outline"
+          :loading="isExporting"
+          @click="downloadExcel"
+        >
+          Download Excel
+        </VBtn>
+
+        <VBtn
+          color="primary"
+          size="large"
+          prepend-icon="mdi-plus"
+          @click="openAdd"
+        >
+          Add {{ config.singular }}
+        </VBtn>
+      </div>
     </div>
 
     <VCard>
@@ -182,7 +255,7 @@ function onSaved(message: string) {
         <VRow>
           <VCol
             cols="12"
-            md="5"
+            md="4"
           >
             <VTextField
               v-model="search"
@@ -195,7 +268,7 @@ function onSaved(message: string) {
           </VCol>
           <VCol
             cols="6"
-            md="3"
+            md="2"
           >
             <VSelect
               v-model="yearFilter"
@@ -214,6 +287,20 @@ function onSaved(message: string) {
               v-model="divisionFilter"
               :items="divisionItems"
               label="Division"
+              density="compact"
+              hide-details
+              clearable
+            />
+          </VCol>
+          <VCol
+            v-if="config.missingOptions"
+            cols="12"
+            md="3"
+          >
+            <VSelect
+              v-model="missingFilter"
+              :items="config.missingOptions"
+              label="Show only"
               density="compact"
               hide-details
               clearable
@@ -241,6 +328,48 @@ function onSaved(message: string) {
         :loading="isLoading"
         class="text-capitalize"
       >
+        <template #item.status="{ item }">
+          <VChip
+            size="small"
+            variant="tonal"
+            :color="item.status === 'completed' ? 'success' : 'warning'"
+          >
+            {{ item.status === 'completed' ? 'Exam done' : 'Awaiting results' }}
+          </VChip>
+        </template>
+
+        <template #item.ame_status="{ item }">
+          <VChip
+            size="small"
+            variant="tonal"
+            :color="item.ame_status === 'completed' ? 'success' : item.ame_status === 'pending' ? 'warning' : 'error'"
+          >
+            {{ item.ame_status === 'completed' ? 'Exam done' : item.ame_status === 'pending' ? 'Awaiting results' : 'No exam yet' }}
+          </VChip>
+        </template>
+
+        <template #item.has_ppa="{ item }">
+          <VChip
+            size="small"
+            variant="tonal"
+            :color="item.has_ppa === 'done' ? 'success' : 'error'"
+          >
+            {{ item.has_ppa === 'done' ? 'Assessed' : 'Not assessed' }}
+          </VChip>
+        </template>
+
+        <template #item.bp_category_label="{ item }">
+          <VChip
+            v-if="item.bp_category"
+            size="small"
+            variant="tonal"
+            :color="BP_COLORS[item.bp_category] ?? 'default'"
+          >
+            {{ BP_LABELS[item.bp_category] ?? item.bp_category }}
+          </VChip>
+          <span v-else>-</span>
+        </template>
+
         <template #item.actions="{ item }">
           <VBtn
             icon="mdi-pencil-outline"
@@ -275,6 +404,16 @@ function onSaved(message: string) {
           Delete the {{ config.singular }} of
           <strong>{{ deleting?.employee_name }}</strong>
           ({{ deleting?.year }})? This cannot be undone.
+
+          <VAlert
+            v-if="config.endpoint === '/annual-medical-exams'"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mt-3"
+          >
+            The PhilPEN assessment of this employee for the same year will also be deleted.
+          </VAlert>
         </VCardText>
         <VCardActions>
           <VSpacer />

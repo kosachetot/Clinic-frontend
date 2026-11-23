@@ -3,7 +3,7 @@
 
 export const REPORT_TITLE = 'Regular Employees Wellbeing Report'
 
-export type ChartDef = {
+export interface ChartDef {
   id: string
   title: string
   type: 'pie' | 'bar'
@@ -12,13 +12,14 @@ export type ChartDef = {
   series?: { name: string; values: number[] }[]
   stacked?: boolean
   distributed?: boolean
+  showPercent?: boolean
   colors?: string[]
   note?: string
 }
 
-export type Stat = { label: string; value: number; color?: string }
+export interface Stat { label: string; value: number; color?: string }
 
-export type Section = {
+export interface Section {
   id: string
   title: string
   icon: string
@@ -29,7 +30,7 @@ export type Section = {
 type AgeGroups = Record<string, number>
 
 // Shape of the response from GET /api/dashboard/stats
-export type WellbeingStats = {
+export interface WellbeingStats {
   year: number
   available_years: number[]
   summary: {
@@ -47,6 +48,7 @@ export type WellbeingStats = {
     needs_counselling: number
     burnout: { fine: number; be_careful: number; candidate: number; burning_out: number }
     hypertension: { with: number; without: number; by_age_group: AgeGroups }
+    blood_pressure: { normal: number; elevated: number; stage1: number; stage2: number; severe: number; not_recorded: number }
   }
   ame: {
     total: number
@@ -57,7 +59,13 @@ export type WellbeingStats = {
     cholesterol: { high: number; normal: number; by_age_group: AgeGroups }
     lipid_profile: { cholesterol: number; triglyceride: number; hdl: number; ldl: number }
   }
-  completion: { complete: number; either_only: number }
+  completion: {
+    philpen_total: number
+    ame_total: number
+    complete: number
+    philpen_only: number
+    ame_only: number
+  }
 }
 
 const RISK = '#e53935'
@@ -66,6 +74,7 @@ const BLUE = '#0a7ea4'
 const AMBER = '#f9a825'
 const ORANGE = '#fb8c00'
 const PINK = '#ec407a'
+const DARK_RED = '#8e0000'
 
 export function buildSummary(stats: WellbeingStats) {
   return {
@@ -88,7 +97,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
       charts: [
         {
           id: 'coverage-by-division',
-          title: 'Assessment coverage by division',
+          title: 'Assessment Coverage by Division',
           type: 'bar',
           stacked: true,
           labels: divisionCodes,
@@ -107,7 +116,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'family-history',
-          title: 'Family history',
+          title: 'Family History',
           type: 'pie',
           labels: ['Yes', 'No'],
           values: [philpen.family_history.yes, philpen.family_history.no],
@@ -115,7 +124,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'tobacco',
-          title: 'Tobacco use',
+          title: 'Tobacco Use',
           type: 'pie',
           labels: ['Former / non-smoker', 'Current user'],
           values: [philpen.tobacco.former_or_never, philpen.tobacco.current],
@@ -124,7 +133,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'alcohol',
-          title: 'Alcohol consumption',
+          title: 'Alcohol Consumption',
           type: 'pie',
           labels: ['Occasional / non-drinker', 'Heavy drinker'],
           values: [philpen.alcohol.occasional_or_none, philpen.alcohol.heavy],
@@ -132,7 +141,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'physical-activity',
-          title: 'Physical activity',
+          title: 'Physical Activity',
           type: 'pie',
           labels: ['Active', 'Inactive'],
           values: [philpen.physical_activity.active, philpen.physical_activity.inactive],
@@ -140,7 +149,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'nutrition',
-          title: 'Nutrition & dietary assessment',
+          title: 'Nutrition & Dietary Assessment',
           type: 'pie',
           labels: ['High fat, salt, sugar', 'No'],
           values: [philpen.nutrition.high_fat_salt_sugar, philpen.nutrition.no],
@@ -156,7 +165,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
       charts: [
         {
           id: 'burnout',
-          title: 'Burn out test',
+          title: 'Burn Out Test',
           type: 'bar',
           distributed: true,
           labels: ['Fine', 'Be careful', 'Candidate', 'Burning out'],
@@ -171,6 +180,60 @@ export function buildSections(stats: WellbeingStats): Section[] {
       ],
     },
     {
+      id: 'blood-pressure',
+      title: 'Blood Pressure',
+      icon: 'mdi-heart-pulse',
+      stats: [
+        {
+          label: 'Employees with BP recorded',
+          value:
+      philpen.blood_pressure.normal
+      + philpen.blood_pressure.elevated
+      + philpen.blood_pressure.stage1
+      + philpen.blood_pressure.stage2
+      + philpen.blood_pressure.severe,
+          color: BLUE,
+        },
+        {
+          label: 'Hypertensive (Stage 1 or higher)',
+          value: philpen.blood_pressure.stage1 + philpen.blood_pressure.stage2 + philpen.blood_pressure.severe,
+          color: RISK,
+        },
+      ],
+      charts: [
+        {
+          id: 'blood-pressure',
+          title: 'Blood Pressure Category',
+          type: 'bar',
+          distributed: true,
+          labels: ['Normal', 'Elevated', 'Stage 1', 'Stage 2', 'Severe / Crisis'],
+          values: [
+            philpen.blood_pressure.normal,
+            philpen.blood_pressure.elevated,
+            philpen.blood_pressure.stage1,
+            philpen.blood_pressure.stage2,
+            philpen.blood_pressure.severe,
+          ],
+          colors: [OK, AMBER, ORANGE, RISK, DARK_RED],
+          note: 'Based on the average of the 2nd and 3rd readings of the PhilPEN assessment.',
+        },
+        {
+          id: 'blood-pressure-risk',
+          title: 'Blood pressure risk level',
+          type: 'pie',
+          showPercent: true,
+          labels: ['Normal (low risk)', 'At risk (Elevated)', 'High risk (Stage 1 or higher)'],
+          values: [
+            philpen.blood_pressure.normal,
+            philpen.blood_pressure.elevated,
+            philpen.blood_pressure.stage1 + philpen.blood_pressure.stage2 + philpen.blood_pressure.severe,
+          ],
+          colors: [OK, AMBER, RISK],
+          note: 'Percentage is based on employees with a recorded BP. Employees with no BP recorded are not counted.',
+        },
+      ],
+    },
+    {
       id: 'ame',
       title: 'Annual Medical Exam',
       icon: 'mdi-stethoscope',
@@ -178,7 +241,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
       charts: [
         {
           id: 'ame-coverage',
-          title: 'Annual medical exam coverage',
+          title: 'Annual Medical Exam Coverage',
           type: 'pie',
           labels: ['With AME', 'Without AME'],
           values: [ame.coverage.with_ame, ame.coverage.without_ame],
@@ -187,7 +250,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'ame-by-division',
-          title: 'Annual medical exam by division',
+          title: 'Annual Medical Exam by Division',
           type: 'bar',
           stacked: true,
           labels: divisionCodes,
@@ -205,7 +268,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'ame-sex',
-          title: 'Consolidated data by sex',
+          title: 'Consolidated Data by Sex',
           type: 'pie',
           labels: ['Male', 'Female'],
           values: [ame.sex.male, ame.sex.female],
@@ -220,7 +283,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
       charts: [
         {
           id: 'dm',
-          title: 'Diabetes mellitus (based on HbA1c)',
+          title: 'Diabetes Mellitus (based on HbA1c)',
           type: 'pie',
           labels: ['With DM', 'Normal result'],
           values: [ame.diabetes.with, ame.diabetes.normal],
@@ -228,7 +291,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'dm-age',
-          title: 'Diabetes mellitus by age group',
+          title: 'Diabetes Mellitus by Age Group',
           type: 'bar',
           labels: Object.keys(ame.diabetes.by_age_group),
           values: Object.values(ame.diabetes.by_age_group),
@@ -244,7 +307,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'cholesterol-age',
-          title: 'Hyperdyslipidemia by age group',
+          title: 'Hyperdyslipidemia by Age Group',
           type: 'bar',
           labels: Object.keys(ame.cholesterol.by_age_group),
           values: Object.values(ame.cholesterol.by_age_group),
@@ -252,7 +315,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'lipid-profile',
-          title: 'Lipid profile (abnormal results)',
+          title: 'Lipid Profile (abnormal results)',
           type: 'bar',
           labels: ['Cholesterol', 'Triglyceride', 'HDL', 'LDL'],
           values: [
@@ -274,7 +337,7 @@ export function buildSections(stats: WellbeingStats): Section[] {
         },
         {
           id: 'hypertension-age',
-          title: 'Hypertension by age group',
+          title: 'Hypertension by Age Group',
           type: 'bar',
           labels: Object.keys(philpen.hypertension.by_age_group),
           values: Object.values(philpen.hypertension.by_age_group),
@@ -288,13 +351,24 @@ export function buildSections(stats: WellbeingStats): Section[] {
       icon: 'mdi-check-decagram-outline',
       charts: [
         {
-          id: 'completion',
-          title: 'PhilPEN, MH assessment, and annual medical exam',
+          id: 'completion-comparison',
+          title: 'PhilPEN Assessment vs Annual Medical Exam',
           type: 'bar',
           distributed: true,
-          labels: ['Complete (both)', 'Either PhilPEN/MH or AME only'],
-          values: [completion.complete, completion.either_only],
-          colors: [OK, AMBER],
+          labels: ['PhilPEN assessed', 'Medical exam done'],
+          values: [completion.philpen_total, completion.ame_total],
+          colors: [BLUE, OK],
+          note: 'Medical exam counts completed exams only.',
+        },
+        {
+          id: 'completion-overlap',
+          title: 'Who Has Completed What',
+          type: 'bar',
+          distributed: true,
+          labels: ['Complete (both)', 'Assessment only', 'Medical exam only'],
+          values: [completion.complete, completion.philpen_only, completion.ame_only],
+          colors: [OK, AMBER, BLUE],
+          note: 'Counted per employee for the selected year.',
         },
       ],
     },

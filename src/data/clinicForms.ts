@@ -46,7 +46,7 @@ const BURNOUT = [
 
 export type FieldType = 'text' | 'number' | 'date' | 'select' | 'bool' | 'textarea' | 'employee' | 'division'
 
-export type FieldDef = {
+export interface FieldDef {
   key: string
   label: string
   type: FieldType
@@ -57,7 +57,7 @@ export type FieldDef = {
 }
 
 // Shape returned by GET /api/employees
-export type Employee = {
+export interface Employee {
   emp_id: number
   name: string
   designation: string | null
@@ -67,13 +67,13 @@ export type Employee = {
   age: number | null
 }
 
-export type FieldGroup = {
+export interface FieldGroup {
   title: string
   note?: string
   fields: FieldDef[]
 }
 
-export type RecordsConfig = {
+export interface RecordsConfig {
   title: string
   subtitle: string
   singular: string
@@ -81,6 +81,7 @@ export type RecordsConfig = {
   dateField: string
   extraColumns: { title: string; key: string }[]
   groups: FieldGroup[]
+  missingOptions?: { title: string; value: string }[]
 }
 
 export const todayLocal = () => new Date().toLocaleDateString('en-CA')
@@ -96,7 +97,11 @@ export const philpenConfig: RecordsConfig = {
   extraColumns: [
     { title: 'Sex', key: 'sex' },
     { title: 'Age', key: 'age' },
+    { title: 'BP', key: 'bp_display' },
+    { title: 'BP category', key: 'bp_category_label' },
+    { title: 'Medical Exam', key: 'ame_status' },
   ],
+  missingOptions: [{ title: 'No medical exam yet', value: 'ame' }],
   groups: [
     {
       title: 'Employee',
@@ -140,6 +145,15 @@ export const philpenConfig: RecordsConfig = {
       ],
     },
     {
+      title: 'Blood pressure',
+      note: 'Enter each reading as systolic/diastolic, e.g. 120/80 (mmHg). The average of the 2nd and 3rd readings and the category are computed automatically when saved.',
+      fields: [
+        { key: 'bp1', label: '1st reading (mmHg, e.g. 120/80)', type: 'text', md: 4 },
+        { key: 'bp2', label: '2nd reading (mmHg, e.g. 120/80)', type: 'text', md: 4 },
+        { key: 'bp3', label: '3rd reading (mmHg, e.g. 120/80)', type: 'text', md: 4 },
+      ],
+    },
+    {
       title: 'Mental health',
       fields: [
         { key: 'srq_score', label: 'SRQ score', type: 'number' },
@@ -167,7 +181,10 @@ export const ameConfig: RecordsConfig = {
     { title: 'Age', key: 'age' },
     { title: 'HbA1c', key: 'hba1c' },
     { title: 'Cholesterol', key: 'cholesterol' },
+    { title: 'Exam Status', key: 'status' },
+    { title: 'PhilPEN Assessment', key: 'has_ppa' },
   ],
+  missingOptions: [{ title: 'No PhilPEN assessment', value: 'ppa' }],
   groups: [
     {
       title: 'Employee',

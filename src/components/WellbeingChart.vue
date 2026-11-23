@@ -88,12 +88,22 @@ const options = computed<ApexOptions>(() => {
     ...base,
     labels: props.chart.labels,
     stroke: { width: 2, colors: [isDark.value ? '#1e1e1e' : '#ffffff'] },
-    plotOptions: { pie: { expandOnClick: false } },
-    // Show the real count inside each slice instead of a percentage
+    plotOptions: {
+      pie: {
+        expandOnClick: false,
+        dataLabels: { offset: -18, minAngleToShowLabel: 8 },
+      },
+    },
+
+    // Real count inside each slice, or the percentage when the chart asks for it
     dataLabels: {
       enabled: true,
-      formatter: (_val: number | string | number[], opts?: any) =>
-        String(opts.w.config.series[opts.seriesIndex]),
+      formatter: (val: number | string | number[], opts?: any) => {
+        if (props.chart.showPercent)
+          return `${Math.round(Number(val))}%`
+
+        return String(opts.w.config.series[opts.seriesIndex])
+      },
       style: { fontSize: props.large ? '24px' : '14px', fontWeight: 700 },
       dropShadow: { enabled: false },
     },
